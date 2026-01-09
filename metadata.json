@@ -1,0 +1,5 @@
+{
+  "name": "LocalMind AI",
+  "description": "A sophisticated AI-powered knowledge base interface featuring document ingestion, context-aware chat, and intelligent flashcard generation, designed to integrate with n8n webhooks.",
+  "requestFramePermissions": []
+}

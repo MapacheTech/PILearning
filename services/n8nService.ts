@@ -4,6 +4,21 @@ import { Message, Flashcard, DocumentFile } from '../types';
 // Helper to simulate network delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Helper to convert File to Base64 string
+const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            const result = reader.result as string;
+            // Remove data:application/pdf;base64, or data:text/plain;base64, prefix
+            const base64 = result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = (error) => reject(error);
+    });
+};
+
 // Helper to generate mock data (used for both demo mode and error fallback)
 const getMockFlashcards = (topic?: string): Flashcard[] => {
     if (topic) {
@@ -93,10 +108,8 @@ export const n8nService = {
     },
 
     async uploadDocument(file: File): Promise<DocumentFile> {
-        const formData = new FormData();
-        formData.append('file', file);
-
         try {
+            // Check for placeholder URL (demo mode)
             if (N8N_WEBHOOKS.UPLOAD.includes('your-n8n-instance')) {
                 await delay(2000);
                 return {
@@ -108,29 +121,65 @@ export const n8nService = {
                 };
             }
 
+            // Validate file before converting to Base64
+            const maxSize = 25 * 1024 * 1024; // 25MB
+            if (file.size > maxSize) {
+                throw new Error(`File too large: ${(file.size / 1024 / 1024).toFixed(2)}MB. Maximum: 25MB`);
+            }
+
+            const allowedTypes = ['application/pdf', 'text/plain'];
+            if (!allowedTypes.includes(file.type)) {
+                throw new Error(`Unsupported file type: ${file.type}. Only PDF and TXT allowed.`);
+            }
+
+            // Convert file to Base64
+            const base64Content = await fileToBase64(file);
+
+            // Send to n8n with JSON format
             const response = await fetch(N8N_WEBHOOKS.UPLOAD, {
                 method: 'POST',
-                body: formData
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    file: base64Content,
+                    filename: file.name
+                })
             });
 
-            if (!response.ok) throw new Error('Upload failed');
-            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ message: 'Upload failed' }));
+                throw new Error(errorData.message || `HTTP ${response.status}`);
+            }
+
+            // Process successful response from n8n workflow
+            const data = await response.json();
+
             return {
                 id: Date.now().toString(),
-                name: file.name,
+                name: data.filename || file.name,
                 type: file.type,
-                status: 'indexed'
+                status: 'indexed',
+                size: data.file_size_mb ? `${data.file_size_mb} MB` : `${(file.size / 1024).toFixed(2)} KB`
             };
 
         } catch (error) {
             console.error('Upload Webhook Error:', error);
+
+            // Improved error handling with specific messages
+            let errorMessage = 'Unknown error';
+            if (error instanceof Error) {
+                errorMessage = error.message;
+            }
+
+            // Show error in console for debugging
+            console.error('Detailed error:', errorMessage);
+
             // Return error status so the UI knows
             return {
                 id: Date.now().toString(),
                 name: file.name,
                 type: file.type,
                 status: 'error',
-                size: '0 KB'
+                size: (file.size / 1024).toFixed(2) + ' KB'
             };
         }
     },

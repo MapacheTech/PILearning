@@ -79,10 +79,24 @@ export const n8nService = {
                 };
             }
 
+            // Generate or retrieve sessionId for conversation memory
+            let sessionId = sessionStorage.getItem('chat_session_id');
+            if (!sessionId) {
+                sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                sessionStorage.setItem('chat_session_id', sessionId);
+            }
+
             const response = await fetch(N8N_WEBHOOKS.CHAT, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message, history })
+                body: JSON.stringify({
+                    message,
+                    sessionId,
+                    history: history.map(m => ({
+                        role: m.role,
+                        content: m.content
+                    }))
+                })
             });
 
             if (!response.ok) throw new Error('Network response was not ok');

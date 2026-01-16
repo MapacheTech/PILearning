@@ -75,23 +75,47 @@ interface FlashcardsScreenProps {
     onNavigate: (view: 'chat' | 'flashcards') => void;
 }
 
+const STORAGE_KEY = 'pilearning_flashcards';
+
 export const FlashcardsScreen: React.FC<FlashcardsScreenProps> = ({ onNavigate }) => {
-    const [cards, setCards] = useState<FlashcardType[]>([]);
+    // Load saved flashcards from localStorage on initial render
+    const [cards, setCards] = useState<FlashcardType[]>(() => {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        return saved ? JSON.parse(saved) : [];
+    });
     const [loading, setLoading] = useState(false);
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [topicInput, setTopicInput] = useState("");
 
-    // Removed automatic load - flashcards are only generated when user submits a topic
+    // Save flashcards to localStorage whenever they change
+    useEffect(() => {
+        if (cards.length > 0) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(cards));
+        }
+    }, [cards]);
 
     const loadCards = async (topic?: string) => {
         setLoading(true);
         // If a topic is passed (from manual input), clear filters to ensure we see the result
         if (topic) setSelectedTags([]);
 
-        const data = await n8nService.generateFlashcards(topic);
-        setCards(data);
+        const newCards = await n8nService.generateFlashcards(topic);
+
+        // Merge: add new cards without duplicating (by question)
+        setCards(prev => {
+            const existingQuestions = new Set(prev.map(c => c.question));
+            const uniqueNew = newCards.filter(c => !existingQuestions.has(c.question));
+            return [...prev, ...uniqueNew];
+        });
+
         setLoading(false);
+    };
+
+    // Clear all flashcards from state and localStorage
+    const clearAllCards = () => {
+        setCards([]);
+        localStorage.removeItem(STORAGE_KEY);
     };
 
     const handleTopicSubmit = () => {
@@ -205,12 +229,21 @@ export const FlashcardsScreen: React.FC<FlashcardsScreenProps> = ({ onNavigate }
                                     )}
                                 </div>
 
-                                <button onClick={() => loadCards()} className="flex items-center gap-2 h-10 px-4 bg-surface-dark border border-surface-border hover:border-primary/50 hover:bg-surface-dark/80 rounded-lg text-white text-sm font-medium transition-all shadow-sm">
+                                <button onClick={() => loadCards()} className="flex items-center gap-2 h-10 px-4 bg-surface-dark border border-surface-border hover:border-primary/50 hover:bg-surface-dark/80 rounded-lg text-white text-sm font-medium transition-all shadow-sm" title="Refresh / Load more">
                                     <span className={`material-symbols-outlined text-[18px] ${loading ? 'animate-spin' : ''}`}>refresh</span>
                                 </button>
-                                <button className="flex items-center gap-2 h-10 px-4 bg-surface-dark border border-surface-border hover:border-primary/50 hover:bg-surface-dark/80 rounded-lg text-white text-sm font-medium transition-all shadow-sm">
+                                <button className="flex items-center gap-2 h-10 px-4 bg-surface-dark border border-surface-border hover:border-primary/50 hover:bg-surface-dark/80 rounded-lg text-white text-sm font-medium transition-all shadow-sm" title="Export">
                                     <span className="material-symbols-outlined text-[18px]">ios_share</span>
                                 </button>
+                                {cards.length > 0 && (
+                                    <button
+                                        onClick={clearAllCards}
+                                        className="flex items-center gap-2 h-10 px-4 bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 hover:border-red-500/50 rounded-lg text-red-400 text-sm font-medium transition-all shadow-sm"
+                                        title="Clear all flashcards"
+                                    >
+                                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                                    </button>
+                                )}
                             </div>
                         </div>
 
@@ -238,8 +271,10 @@ export const FlashcardsScreen: React.FC<FlashcardsScreenProps> = ({ onNavigate }
                                     </div>
                                 )}
                                 {cards.length === 0 && (
-                                    <div className="col-span-full text-center py-20 text-gray-500">
-                                        No flashcards generated yet. Check your webhook connection.
+                                    <div className="col-span-full flex flex-col items-center justify-center py-20 text-gray-500">
+                                        <span className="material-symbols-outlined text-[48px] mb-2 opacity-50">school</span>
+                                        <p>No flashcards yet.</p>
+                                        <p className="text-sm mt-1">Enter a topic above to generate flashcards.</p>
                                     </div>
                                 )}
                             </div>

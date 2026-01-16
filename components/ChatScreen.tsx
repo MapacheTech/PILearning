@@ -13,7 +13,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ onNavigate }) => {
         {
             id: '1',
             role: 'ai',
-            content: "I've analyzed the uploaded documents. I have context on the <strong>Q3 Financial Report</strong>, <strong>Project Alpha Specs</strong>, and your recent <strong>Meeting Notes</strong>.<br/><br/>You can ask me specific questions about revenue, project milestones, or generate a summary. What would you like to do?"
+            content: "¡Hola! Soy tu asistente de PI Learning. Sube documentos usando el panel izquierdo y podré ayudarte a estudiar, generar flashcards y responder preguntas sobre el contenido.<br/><br/>¿En qué puedo ayudarte hoy?"
         }
     ]);
     const [inputValue, setInputValue] = useState("");
@@ -30,16 +30,16 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ onNavigate }) => {
 
     const handleSendMessage = async () => {
         if (!inputValue.trim() || isTyping) return;
-        
+
         const currentText = inputValue;
         setInputValue("");
-        
-        const newUserMsg: Message = { 
-            id: Date.now().toString(), 
-            role: 'user', 
-            content: currentText 
+
+        const newUserMsg: Message = {
+            id: Date.now().toString(),
+            role: 'user',
+            content: currentText
         };
-        
+
         setMessages(prev => [...prev, newUserMsg]);
         setIsTyping(true);
 
@@ -67,7 +67,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ onNavigate }) => {
             <Sidebar onNavigate={onNavigate} />
             <main className="flex-1 flex flex-col relative bg-background-dark min-w-0">
                 <TopNav activeTab="chat" onNavigate={onNavigate} />
-                
+
                 {/* Chat Area */}
                 <div className="flex-1 overflow-y-auto w-full relative custom-scrollbar">
                     <div className="max-w-4xl mx-auto w-full px-6 py-10 flex flex-col gap-8 pb-48">
@@ -81,11 +81,11 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ onNavigate }) => {
                                 {/* Avatar */}
                                 {msg.role === 'ai' ? (
                                     <div className="size-8 rounded-full bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center shrink-0 mt-1 shadow-lg shadow-indigo-500/20">
-                                        <span className="material-symbols-outlined text-white" style={{fontSize: '18px'}}>auto_awesome</span>
+                                        <span className="material-symbols-outlined text-white" style={{ fontSize: '18px' }}>auto_awesome</span>
                                     </div>
                                 ) : (
-                                    <img 
-                                        src="https://picsum.photos/100" 
+                                    <img
+                                        src="https://picsum.photos/100"
                                         className="size-8 rounded-full border border-white/10 shrink-0 mt-1"
                                         alt="User"
                                     />
@@ -93,7 +93,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ onNavigate }) => {
 
                                 <div className={`flex flex-col gap-2 max-w-2xl ${msg.role === 'user' ? 'items-end' : ''}`}>
                                     <div className="flex items-baseline gap-2">
-                                        <span className="text-sm font-semibold text-white">{msg.role === 'ai' ? 'LocalMind AI' : 'You'}</span>
+                                        <span className="text-sm font-semibold text-white">{msg.role === 'ai' ? 'PI Learning' : 'You'}</span>
                                         {msg.verified && (
                                             <span className="text-xs text-gray-500 flex items-center gap-1">
                                                 <span className="material-symbols-outlined text-[14px]">check_circle</span>
@@ -101,15 +101,14 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ onNavigate }) => {
                                             </span>
                                         )}
                                     </div>
-                                    <div 
-                                        className={`px-5 py-4 rounded-2xl text-base leading-relaxed shadow-sm ${
-                                            msg.role === 'ai' 
-                                            ? 'bg-surface-dark rounded-tl-sm text-gray-200 border border-white/5' 
-                                            : 'bg-primary rounded-tr-sm text-white shadow-lg shadow-primary/10'
-                                        }`}
+                                    <div
+                                        className={`px-5 py-4 rounded-2xl text-base leading-relaxed shadow-sm ${msg.role === 'ai'
+                                                ? 'bg-surface-dark rounded-tl-sm text-gray-200 border border-white/5'
+                                                : 'bg-primary rounded-tr-sm text-white shadow-lg shadow-primary/10'
+                                            }`}
                                     >
                                         <div dangerouslySetInnerHTML={{ __html: msg.content }} />
-                                        
+
                                         {msg.actions && (
                                             <div className="flex gap-2 mt-4">
                                                 <button className="text-xs font-medium text-primary hover:text-indigo-300 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors">
@@ -124,20 +123,20 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ onNavigate }) => {
                                 </div>
                             </div>
                         ))}
-                        
+
                         {isTyping && (
-                             <div className="flex gap-4">
+                            <div className="flex gap-4">
                                 <div className="size-8 rounded-full bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center shrink-0 mt-1">
-                                    <span className="material-symbols-outlined text-white" style={{fontSize: '18px'}}>auto_awesome</span>
+                                    <span className="material-symbols-outlined text-white" style={{ fontSize: '18px' }}>auto_awesome</span>
                                 </div>
                                 <div className="bg-surface-dark rounded-2xl rounded-tl-sm px-5 py-4 border border-white/5">
                                     <div className="flex gap-1 h-6 items-center">
                                         <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                                        <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-                                        <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></div>
+                                        <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                                        <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
                                     </div>
                                 </div>
-                             </div>
+                            </div>
                         )}
                         <div ref={messagesEndRef} />
                     </div>
@@ -149,11 +148,11 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ onNavigate }) => {
                         {/* Quick Action Chips */}
                         <div className="flex items-center justify-center gap-2 overflow-x-auto no-scrollbar py-1">
                             <button onClick={() => setInputValue("Summarize the documents")} className="flex items-center gap-1.5 bg-surface-dark border border-primary/20 hover:border-primary/50 text-white text-xs font-medium px-4 py-2 rounded-full shadow-lg shadow-black/20 hover:bg-[#2a2b45] transition-all transform hover:-translate-y-0.5">
-                                <span className="material-symbols-outlined text-primary" style={{fontSize: '16px'}}>auto_awesome</span>
+                                <span className="material-symbols-outlined text-primary" style={{ fontSize: '16px' }}>auto_awesome</span>
                                 Summarize Documents
                             </button>
                             <button onClick={() => setInputValue("Create a timeline from Project Alpha")} className="flex items-center gap-1.5 bg-surface-dark border border-white/5 hover:border-white/20 text-white text-xs font-medium px-4 py-2 rounded-full shadow-lg shadow-black/20 hover:bg-[#2a2b45] transition-all transform hover:-translate-y-0.5">
-                                <span className="material-symbols-outlined text-emerald-400" style={{fontSize: '16px'}}>timeline</span>
+                                <span className="material-symbols-outlined text-emerald-400" style={{ fontSize: '16px' }}>timeline</span>
                                 Create Timeline
                             </button>
                         </div>
@@ -162,10 +161,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ onNavigate }) => {
                             <div className={`absolute inset-0 bg-primary/20 blur-xl rounded-full transition-opacity duration-500 ${isTyping ? 'opacity-50' : 'opacity-0 group-hover:opacity-100'}`}></div>
                             <div className="relative flex items-center gap-2 bg-[#1e1e2e]/90 backdrop-blur-xl border border-white/10 rounded-2xl p-2 shadow-2xl">
                                 <button className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
-                                    <span className="material-symbols-outlined" style={{fontSize: '24px'}}>add_circle</span>
+                                    <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>add_circle</span>
                                 </button>
-                                <input 
-                                    className="flex-1 bg-transparent border-none text-white placeholder-gray-500 focus:ring-0 text-base py-2" 
+                                <input
+                                    className="flex-1 bg-transparent border-none text-white placeholder-gray-500 focus:ring-0 text-base py-2"
                                     placeholder={isTyping ? "Thinking..." : "Ask a question about your sources..."}
                                     type="text"
                                     value={inputValue}
@@ -175,19 +174,19 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ onNavigate }) => {
                                 />
                                 <div className="flex items-center gap-1">
                                     <button className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-colors" title="Voice Input">
-                                        <span className="material-symbols-outlined" style={{fontSize: '24px'}}>mic</span>
+                                        <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>mic</span>
                                     </button>
-                                    <button 
+                                    <button
                                         onClick={handleSendMessage}
                                         disabled={isTyping || !inputValue.trim()}
                                         className={`p-2 rounded-xl text-white transition-colors shadow-lg ${isTyping || !inputValue.trim() ? 'bg-gray-700 cursor-not-allowed' : 'bg-primary hover:bg-indigo-500 shadow-primary/25'}`}
                                     >
-                                        <span className="material-symbols-outlined" style={{fontSize: '24px'}}>arrow_upward</span>
+                                        <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>arrow_upward</span>
                                     </button>
                                 </div>
                             </div>
                         </div>
-                        <p className="text-center text-[10px] text-gray-600 mt-1">LocalMind AI can make mistakes. Please verify important information.</p>
+                        <p className="text-center text-[10px] text-gray-600 mt-1">PI Learning puede cometer errores. Por favor verifica la información importante.</p>
                     </div>
                 </div>
             </main>

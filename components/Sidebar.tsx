@@ -1,6 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { DocumentFile } from '../types';
 import { n8nService } from '../services/n8nService';
+
+const DOCUMENTS_STORAGE_KEY = 'pilearning_documents';
 
 interface SidebarProps {
     onNavigate: (view: 'chat' | 'flashcards') => void;
@@ -8,12 +10,25 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [documents, setDocuments] = useState<DocumentFile[]>([
-        { id: '1', name: 'Q3_Financial_Report.pdf', type: 'application/pdf', status: 'indexed' },
-        { id: '2', name: 'Project_Alpha_Specs.pdf', type: 'application/pdf', status: 'indexed' },
-        { id: '3', name: 'Meeting_Notes_Oct.txt', type: 'text/plain', status: 'indexed' },
-    ]);
+    const [documents, setDocuments] = useState<DocumentFile[]>([]);
     const [isUploading, setIsUploading] = useState(false);
+
+    // Load documents from localStorage on mount
+    useEffect(() => {
+        const saved = localStorage.getItem(DOCUMENTS_STORAGE_KEY);
+        if (saved) {
+            try {
+                setDocuments(JSON.parse(saved));
+            } catch (e) {
+                console.error('Error parsing saved documents:', e);
+            }
+        }
+    }, []);
+
+    // Save documents to localStorage whenever they change
+    useEffect(() => {
+        localStorage.setItem(DOCUMENTS_STORAGE_KEY, JSON.stringify(documents));
+    }, [documents]);
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -38,7 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
                 <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-primary" style={{ fontSize: '28px' }}>neurology</span>
                     <div className="flex flex-col">
-                        <h3 className="text-white tracking-tight text-xl font-bold leading-tight">LocalMind</h3>
+                        <h3 className="text-white tracking-tight text-xl font-bold leading-tight">PI Learning</h3>
                     </div>
                 </div>
             </div>
@@ -84,13 +99,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
 
             {/* Dropzone / Upload Button */}
             <div className="p-4">
-                <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    className="hidden" 
-                    onChange={handleFileChange} 
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    onChange={handleFileChange}
                 />
-                <button 
+                <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploading}
                     className="w-full flex flex-col items-center gap-3 rounded-xl border-2 border-dashed border-[#333466] bg-white/5 hover:bg-white/10 transition-colors p-4 cursor-pointer group disabled:opacity-50"
@@ -108,14 +123,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
             {/* User Profile */}
             <div className="p-4 border-t border-white/5">
                 <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 cursor-pointer transition-colors">
-                    <img 
-                        src="https://picsum.photos/100" 
+                    <img
+                        src="https://picsum.photos/100"
                         alt="User"
-                        className="rounded-full size-9 shadow-inner border border-white/10" 
+                        className="rounded-full size-9 shadow-inner border border-white/10"
                     />
                     <div className="flex flex-col min-w-0">
                         <p className="text-white text-sm font-medium leading-tight truncate">User</p>
-                        <p className="text-[#9293c8] text-xs font-normal truncate">user@localmind.ai</p>
+                        <p className="text-[#9293c8] text-xs font-normal truncate">user@pilearning.ai</p>
                     </div>
                     <span className="material-symbols-outlined text-gray-500 ml-auto" style={{ fontSize: '18px' }}>settings</span>
                 </div>

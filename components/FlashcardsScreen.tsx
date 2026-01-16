@@ -7,10 +7,10 @@ import { n8nService } from '../services/n8nService';
 // Individual Card Component
 const FlashcardItem: React.FC<FlashcardType & { flipped?: boolean }> = ({ title, question, answer, tag, color, flipped = false }) => {
     const [isFlipped, setIsFlipped] = useState(flipped);
-    
+
     // Fallback for title/question mapping if API returns different structure
     const displayTitle = title || question;
-    
+
     const tagStyles: Record<string, { bg: string; text: string; border: string }> = {
         red: { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/20' },
         blue: { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20' },
@@ -22,7 +22,7 @@ const FlashcardItem: React.FC<FlashcardType & { flipped?: boolean }> = ({ title,
 
     if (isFlipped) {
         return (
-            <div 
+            <div
                 onClick={() => setIsFlipped(false)}
                 className="group relative flex flex-col justify-between h-[280px] p-6 rounded-xl border border-primary/50 bg-surface-dark shadow-xl shadow-primary/5 hover:-translate-y-1 transition-all duration-300 cursor-pointer ring-1 ring-primary/20 animate-in fade-in zoom-in-95 duration-200"
             >
@@ -41,15 +41,15 @@ const FlashcardItem: React.FC<FlashcardType & { flipped?: boolean }> = ({ title,
                     <p className="text-white text-base font-normal leading-relaxed">{answer}</p>
                 </div>
                 <div className="mt-4 flex gap-2 pt-2 border-t border-white/5">
-                    <button className="flex-1 h-8 rounded bg-green-500/20 text-green-400 text-xs font-bold hover:bg-green-500/30 transition-colors" onClick={(e) => {e.stopPropagation(); setIsFlipped(false);}}>Got it</button>
-                    <button className="flex-1 h-8 rounded bg-red-500/20 text-red-400 text-xs font-bold hover:bg-red-500/30 transition-colors" onClick={(e) => {e.stopPropagation(); setIsFlipped(false);}}>Study again</button>
+                    <button className="flex-1 h-8 rounded bg-green-500/20 text-green-400 text-xs font-bold hover:bg-green-500/30 transition-colors" onClick={(e) => { e.stopPropagation(); setIsFlipped(false); }}>Got it</button>
+                    <button className="flex-1 h-8 rounded bg-red-500/20 text-red-400 text-xs font-bold hover:bg-red-500/30 transition-colors" onClick={(e) => { e.stopPropagation(); setIsFlipped(false); }}>Study again</button>
                 </div>
             </div>
         )
     }
 
     return (
-        <div 
+        <div
             onClick={() => setIsFlipped(true)}
             className="group relative flex flex-col justify-between h-[280px] p-6 rounded-xl border border-surface-border bg-surface-dark shadow-xl hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/10 hover:border-primary/30 transition-all duration-300 cursor-pointer"
         >
@@ -82,16 +82,13 @@ export const FlashcardsScreen: React.FC<FlashcardsScreenProps> = ({ onNavigate }
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [topicInput, setTopicInput] = useState("");
 
-    // Initial load simulation
-    useEffect(() => {
-        loadCards();
-    }, []);
+    // Removed automatic load - flashcards are only generated when user submits a topic
 
     const loadCards = async (topic?: string) => {
         setLoading(true);
         // If a topic is passed (from manual input), clear filters to ensure we see the result
         if (topic) setSelectedTags([]);
-        
+
         const data = await n8nService.generateFlashcards(topic);
         setCards(data);
         setLoading(false);
@@ -109,13 +106,13 @@ export const FlashcardsScreen: React.FC<FlashcardsScreenProps> = ({ onNavigate }
 
     // Filter Logic
     const uniqueTags = Array.from(new Set(cards.map(c => c.tag))).filter((tag): tag is string => !!tag).sort();
-    
-    const filteredCards = cards.filter(card => 
+
+    const filteredCards = cards.filter(card =>
         selectedTags.length === 0 || selectedTags.includes(card.tag)
     );
 
     const toggleTag = (tag: string) => {
-        setSelectedTags(prev => 
+        setSelectedTags(prev =>
             prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
         );
     };
@@ -134,9 +131,9 @@ export const FlashcardsScreen: React.FC<FlashcardsScreenProps> = ({ onNavigate }
                             <div className="flex flex-col">
                                 <h2 className="text-2xl font-bold text-white tracking-tight">Study Deck</h2>
                                 <p className="text-text-secondary text-sm mt-1">
-                                    {loading 
-                                        ? 'Loading...' 
-                                        : filteredCards.length !== cards.length 
+                                    {loading
+                                        ? 'Loading...'
+                                        : filteredCards.length !== cards.length
                                             ? `Showing ${filteredCards.length} of ${cards.length} cards`
                                             : `Reviewing all ${cards.length} cards`
                                     }
@@ -145,7 +142,7 @@ export const FlashcardsScreen: React.FC<FlashcardsScreenProps> = ({ onNavigate }
                             <div className="flex flex-wrap items-center gap-3">
                                 {/* Topic Input Field */}
                                 <div className="relative group min-w-[200px] sm:min-w-[250px]">
-                                    <input 
+                                    <input
                                         type="text"
                                         value={topicInput}
                                         onChange={(e) => setTopicInput(e.target.value)}
@@ -153,7 +150,7 @@ export const FlashcardsScreen: React.FC<FlashcardsScreenProps> = ({ onNavigate }
                                         placeholder="Enter topic to generate..."
                                         className="w-full bg-surface-dark border border-surface-border text-white text-sm rounded-lg pl-3 pr-10 py-2.5 focus:ring-1 focus:ring-primary focus:border-primary placeholder-gray-500 transition-all shadow-sm"
                                     />
-                                    <button 
+                                    <button
                                         onClick={handleTopicSubmit}
                                         className="absolute right-1.5 top-1.5 p-1 rounded-md bg-white/5 text-gray-400 hover:text-primary hover:bg-white/10 transition-colors"
                                     >
@@ -167,11 +164,10 @@ export const FlashcardsScreen: React.FC<FlashcardsScreenProps> = ({ onNavigate }
                                 <div className="relative">
                                     <button
                                         onClick={() => setIsFilterOpen(!isFilterOpen)}
-                                        className={`flex items-center gap-2 h-10 px-4 border rounded-lg text-sm font-medium transition-all shadow-sm ${
-                                            isFilterOpen || selectedTags.length > 0
+                                        className={`flex items-center gap-2 h-10 px-4 border rounded-lg text-sm font-medium transition-all shadow-sm ${isFilterOpen || selectedTags.length > 0
                                                 ? 'bg-primary/20 border-primary/50 text-white'
                                                 : 'bg-surface-dark border-surface-border text-gray-300 hover:text-white hover:border-primary/50 hover:bg-surface-dark/80'
-                                        }`}
+                                            }`}
                                     >
                                         <span className="material-symbols-outlined text-[18px]">filter_list</span>
                                         <span>Filter</span>
@@ -196,9 +192,8 @@ export const FlashcardsScreen: React.FC<FlashcardsScreenProps> = ({ onNavigate }
                                                         <button
                                                             key={tag}
                                                             onClick={() => toggleTag(tag)}
-                                                            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-                                                                selectedTags.includes(tag) ? 'bg-primary/20 text-white' : 'text-gray-300 hover:bg-white/5'
-                                                            }`}
+                                                            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${selectedTags.includes(tag) ? 'bg-primary/20 text-white' : 'text-gray-300 hover:bg-white/5'
+                                                                }`}
                                                         >
                                                             <span>{tag}</span>
                                                             {selectedTags.includes(tag) && <span className="material-symbols-outlined text-[16px] text-primary">check</span>}
@@ -221,15 +216,15 @@ export const FlashcardsScreen: React.FC<FlashcardsScreenProps> = ({ onNavigate }
 
                         {/* Flashcards Grid */}
                         {loading ? (
-                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pb-20">
-                                {[1,2,3,4,5,6].map(i => (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pb-20">
+                                {[1, 2, 3, 4, 5, 6].map(i => (
                                     <div key={i} className="h-[280px] rounded-xl border border-white/5 bg-surface-dark animate-pulse relative">
                                         <div className="absolute top-6 left-6 w-20 h-6 bg-white/10 rounded"></div>
                                         <div className="absolute top-1/2 left-6 right-6 h-4 bg-white/5 rounded"></div>
                                         <div className="absolute top-1/2 mt-6 left-6 right-16 h-4 bg-white/5 rounded"></div>
                                     </div>
                                 ))}
-                             </div>
+                            </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pb-20">
                                 {filteredCards.map((card) => (

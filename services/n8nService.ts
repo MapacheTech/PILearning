@@ -86,7 +86,7 @@ export const n8nService = {
             });
 
             if (!response.ok) throw new Error('Network response was not ok');
-            
+
             const data = await response.json();
             return {
                 id: Date.now().toString(),
@@ -195,7 +195,7 @@ export const n8nService = {
             const response = await fetch(N8N_WEBHOOKS.FLASHCARDS, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     action: topic ? 'generate_specific' : 'generate_all',
                     topic: topic || ''
                 })
@@ -204,12 +204,35 @@ export const n8nService = {
             if (!response.ok) throw new Error('Flashcard generation failed');
 
             const data = await response.json();
-            return data.flashcards || [];
+
+            // Handle n8n response format: can be an array [{ flashcards: [...] }] or object { flashcards: [...] }
+            let flashcardsRaw: any[] = [];
+            if (Array.isArray(data) && data.length > 0 && data[0].flashcards) {
+                // n8n returns array wrapper: [{ flashcards: [...] }]
+                flashcardsRaw = data[0].flashcards;
+            } else if (data.flashcards) {
+                // Direct object: { flashcards: [...] }
+                flashcardsRaw = data.flashcards;
+            } else if (Array.isArray(data)) {
+                // Direct array of flashcards
+                flashcardsRaw = data;
+            }
+
+            // Map Spanish field names to English and ensure consistent structure
+            const flashcards: Flashcard[] = flashcardsRaw.map((card: any) => ({
+                id: card.id || Date.now().toString() + Math.random(),
+                question: card.question || card.pregunta || '',
+                answer: card.answer || card.respuesta || '',
+                tag: card.tag || card.etiqueta || 'General',
+                color: card.color || 'blue'
+            }));
+
+            return flashcards;
 
         } catch (error) {
             console.error('Flashcard Webhook Error:', error);
             console.warn('Falling back to mock data due to network error.');
-            
+
             // CRITICAL FIX: Return mock data instead of empty array on network failure
             // This ensures the UI still works even if CORS/Mixed Content blocks the request
             return getMockFlashcards(topic);

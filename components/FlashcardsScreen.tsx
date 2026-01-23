@@ -5,11 +5,11 @@ import { Flashcard as FlashcardType } from '../types';
 import { n8nService } from '../services/n8nService';
 
 // Individual Card Component
-const FlashcardItem: React.FC<FlashcardType & { flipped?: boolean }> = ({ title, question, answer, tag, color, flipped = false }) => {
+const FlashcardItem: React.FC<FlashcardType & { flipped?: boolean }> = ({ question, answer, tag, color, topic, category, flipped = false }) => {
     const [isFlipped, setIsFlipped] = useState(flipped);
 
-    // Fallback for title/question mapping if API returns different structure
-    const displayTitle = title || question;
+    // Use question as the display title
+    const displayTitle = question;
 
     const tagStyles: Record<string, { bg: string; text: string; border: string }> = {
         red: { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/20' },
@@ -77,6 +77,10 @@ interface FlashcardsScreenProps {
 
 const STORAGE_KEY = 'pilearning_flashcards';
 
+const MIN_CARDS = 5;
+const MAX_CARDS = 15;
+const DEFAULT_CARDS = 10;
+
 export const FlashcardsScreen: React.FC<FlashcardsScreenProps> = ({ onNavigate }) => {
     // Load saved flashcards from localStorage on initial render
     const [cards, setCards] = useState<FlashcardType[]>(() => {
@@ -85,8 +89,11 @@ export const FlashcardsScreen: React.FC<FlashcardsScreenProps> = ({ onNavigate }
     });
     const [loading, setLoading] = useState(false);
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
+    const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+    const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([]);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [topicInput, setTopicInput] = useState("");
+    const [cardCount, setCardCount] = useState(DEFAULT_CARDS);
 
     // Save flashcards to localStorage whenever they change
     useEffect(() => {
@@ -98,9 +105,13 @@ export const FlashcardsScreen: React.FC<FlashcardsScreenProps> = ({ onNavigate }
     const loadCards = async (topic?: string) => {
         setLoading(true);
         // If a topic is passed (from manual input), clear filters to ensure we see the result
-        if (topic) setSelectedTags([]);
+        if (topic) {
+            setSelectedTags([]);
+            setSelectedCategories([]);
+            setSelectedSubcategories([]);
+        }
 
-        const newCards = await n8nService.generateFlashcards(topic);
+        const newCards = await n8nService.generateFlashcards(topic, cardCount);
 
         // Merge: add new cards without duplicating (by question)
         setCards(prev => {
@@ -130,16 +141,41 @@ export const FlashcardsScreen: React.FC<FlashcardsScreenProps> = ({ onNavigate }
 
     // Filter Logic
     const uniqueTags = Array.from(new Set(cards.map(c => c.tag))).filter((tag): tag is string => !!tag).sort();
+    const uniqueCategories = Array.from(new Set(cards.map(c => c.category))).filter((cat): cat is string => !!cat).sort();
+    const uniqueSubcategories = Array.from(new Set(cards.map(c => c.subcategory))).filter((sub): sub is string => !!sub).sort();
 
-    const filteredCards = cards.filter(card =>
-        selectedTags.length === 0 || selectedTags.includes(card.tag)
-    );
+    const filteredCards = cards.filter(card => {
+        const tagMatch = selectedTags.length === 0 || selectedTags.includes(card.tag);
+        const catMatch = selectedCategories.length === 0 || selectedCategories.includes(card.category);
+        const subMatch = selectedSubcategories.length === 0 || selectedSubcategories.includes(card.subcategory);
+        return tagMatch && catMatch && subMatch;
+    });
 
     const toggleTag = (tag: string) => {
         setSelectedTags(prev =>
             prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
         );
     };
+
+    const toggleCategory = (cat: string) => {
+        setSelectedCategories(prev =>
+            prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
+        );
+    };
+
+    const toggleSubcategory = (sub: string) => {
+        setSelectedSubcategories(prev =>
+            prev.includes(sub) ? prev.filter(s => s !== sub) : [...prev, sub]
+        );
+    };
+
+    const clearAllFilters = () => {
+        setSelectedTags([]);
+        setSelectedCategories([]);
+        setSelectedSubcategories([]);
+    };
+
+    const totalActiveFilters = selectedTags.length + selectedCategories.length + selectedSubcategories.length;
 
     return (
         <div className="flex h-screen bg-background-dark overflow-hidden">
@@ -182,48 +218,113 @@ export const FlashcardsScreen: React.FC<FlashcardsScreenProps> = ({ onNavigate }
                                     </button>
                                 </div>
 
+                                {/* Card Count Selector */}
+                                <div className="flex items-center gap-2 bg-surface-dark border border-surface-border rounded-lg px-3 py-1.5">
+                                    <label className="text-xs text-gray-400 whitespace-nowrap">Cards:</label>
+                                    <input
+                                        type="number"
+                                        min={MIN_CARDS}
+                                        max={MAX_CARDS}
+                                        value={cardCount}
+                                        onChange={(e) => setCardCount(Math.min(MAX_CARDS, Math.max(MIN_CARDS, parseInt(e.target.value) || DEFAULT_CARDS)))}
+                                        className="w-12 bg-transparent border-none text-white text-sm text-center focus:ring-0 focus:outline-none"
+                                    />
+                                </div>
+
                                 <div className="w-px h-8 bg-white/10 mx-1 hidden sm:block"></div>
 
                                 {/* Filter Button with Dropdown */}
                                 <div className="relative">
                                     <button
                                         onClick={() => setIsFilterOpen(!isFilterOpen)}
-                                        className={`flex items-center gap-2 h-10 px-4 border rounded-lg text-sm font-medium transition-all shadow-sm ${isFilterOpen || selectedTags.length > 0
+                                        className={`flex items-center gap-2 h-10 px-4 border rounded-lg text-sm font-medium transition-all shadow-sm ${isFilterOpen || totalActiveFilters > 0
                                                 ? 'bg-primary/20 border-primary/50 text-white'
                                                 : 'bg-surface-dark border-surface-border text-gray-300 hover:text-white hover:border-primary/50 hover:bg-surface-dark/80'
                                             }`}
                                     >
                                         <span className="material-symbols-outlined text-[18px]">filter_list</span>
-                                        <span>Filter</span>
-                                        {selectedTags.length > 0 && (
-                                            <span className="ml-1 bg-primary text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">{selectedTags.length}</span>
+                                        <span>Filtros</span>
+                                        {totalActiveFilters > 0 && (
+                                            <span className="ml-1 bg-primary text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">{totalActiveFilters}</span>
                                         )}
                                     </button>
 
                                     {isFilterOpen && (
                                         <>
                                             <div className="fixed inset-0 z-10" onClick={() => setIsFilterOpen(false)}></div>
-                                            <div className="absolute top-full mt-2 right-0 sm:right-auto sm:left-0 w-56 bg-[#1E1F30] border border-white/10 rounded-xl shadow-2xl z-20 p-1.5 animate-in fade-in zoom-in-95 duration-200">
+                                            <div className="absolute top-full mt-2 right-0 sm:right-auto sm:left-0 w-72 bg-[#1E1F30] border border-white/10 rounded-xl shadow-2xl z-20 p-1.5 animate-in fade-in zoom-in-95 duration-200 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                                                {/* Header */}
                                                 <div className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider flex justify-between items-center border-b border-white/5 mb-1">
-                                                    <span>Filter by Tag</span>
-                                                    {selectedTags.length > 0 && (
-                                                        <button onClick={() => setSelectedTags([])} className="text-primary hover:text-indigo-300 transition-colors">Clear</button>
+                                                    <span>Filtros</span>
+                                                    {totalActiveFilters > 0 && (
+                                                        <button onClick={clearAllFilters} className="text-primary hover:text-indigo-300 transition-colors">Limpiar todo</button>
                                                     )}
                                                 </div>
-                                                <div className="max-h-60 overflow-y-auto custom-scrollbar p-1 space-y-1">
-                                                    {uniqueTags.length === 0 && <p className="text-gray-500 text-xs px-2 py-1">No tags found</p>}
-                                                    {uniqueTags.map(tag => (
-                                                        <button
-                                                            key={tag}
-                                                            onClick={() => toggleTag(tag)}
-                                                            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${selectedTags.includes(tag) ? 'bg-primary/20 text-white' : 'text-gray-300 hover:bg-white/5'
-                                                                }`}
-                                                        >
-                                                            <span>{tag}</span>
-                                                            {selectedTags.includes(tag) && <span className="material-symbols-outlined text-[16px] text-primary">check</span>}
-                                                        </button>
-                                                    ))}
+
+                                                {/* Tags Section */}
+                                                <div className="mb-3">
+                                                    <div className="px-3 py-1.5 text-xs font-medium text-gray-500 flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[14px]">label</span>
+                                                        Tags {selectedTags.length > 0 && `(${selectedTags.length})`}
+                                                    </div>
+                                                    <div className="p-1 space-y-0.5">
+                                                        {uniqueTags.length === 0 && <p className="text-gray-500 text-xs px-2 py-1">No hay tags</p>}
+                                                        {uniqueTags.map(tag => (
+                                                            <button
+                                                                key={tag}
+                                                                onClick={() => toggleTag(tag)}
+                                                                className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-sm transition-colors ${selectedTags.includes(tag) ? 'bg-primary/20 text-white' : 'text-gray-300 hover:bg-white/5'}`}
+                                                            >
+                                                                <span>{tag}</span>
+                                                                {selectedTags.includes(tag) && <span className="material-symbols-outlined text-[14px] text-primary">check</span>}
+                                                            </button>
+                                                        ))}
+                                                    </div>
                                                 </div>
+
+                                                {/* Categories Section */}
+                                                {uniqueCategories.length > 0 && (
+                                                    <div className="mb-3 border-t border-white/5 pt-2">
+                                                        <div className="px-3 py-1.5 text-xs font-medium text-gray-500 flex items-center gap-1">
+                                                            <span className="material-symbols-outlined text-[14px]">category</span>
+                                                            Categoría {selectedCategories.length > 0 && `(${selectedCategories.length})`}
+                                                        </div>
+                                                        <div className="p-1 space-y-0.5">
+                                                            {uniqueCategories.map(cat => (
+                                                                <button
+                                                                    key={cat}
+                                                                    onClick={() => toggleCategory(cat)}
+                                                                    className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-sm transition-colors ${selectedCategories.includes(cat) ? 'bg-emerald-500/20 text-emerald-400' : 'text-gray-300 hover:bg-white/5'}`}
+                                                                >
+                                                                    <span>{cat}</span>
+                                                                    {selectedCategories.includes(cat) && <span className="material-symbols-outlined text-[14px] text-emerald-400">check</span>}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Subcategories Section */}
+                                                {uniqueSubcategories.length > 0 && (
+                                                    <div className="border-t border-white/5 pt-2">
+                                                        <div className="px-3 py-1.5 text-xs font-medium text-gray-500 flex items-center gap-1">
+                                                            <span className="material-symbols-outlined text-[14px]">folder</span>
+                                                            Subcategoría {selectedSubcategories.length > 0 && `(${selectedSubcategories.length})`}
+                                                        </div>
+                                                        <div className="p-1 space-y-0.5">
+                                                            {uniqueSubcategories.map(sub => (
+                                                                <button
+                                                                    key={sub}
+                                                                    onClick={() => toggleSubcategory(sub)}
+                                                                    className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-sm transition-colors ${selectedSubcategories.includes(sub) ? 'bg-amber-500/20 text-amber-400' : 'text-gray-300 hover:bg-white/5'}`}
+                                                                >
+                                                                    <span>{sub}</span>
+                                                                    {selectedSubcategories.includes(sub) && <span className="material-symbols-outlined text-[14px] text-amber-400">check</span>}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </>
                                     )}
@@ -266,15 +367,15 @@ export const FlashcardsScreen: React.FC<FlashcardsScreenProps> = ({ onNavigate }
                                 {filteredCards.length === 0 && cards.length > 0 && (
                                     <div className="col-span-full flex flex-col items-center justify-center py-20 text-gray-500">
                                         <span className="material-symbols-outlined text-[48px] mb-2 opacity-50">filter_list_off</span>
-                                        <p>No cards match the selected filters.</p>
-                                        <button onClick={() => setSelectedTags([])} className="mt-4 text-primary hover:underline">Clear filters</button>
+                                        <p>No hay cards que coincidan con los filtros.</p>
+                                        <button onClick={clearAllFilters} className="mt-4 text-primary hover:underline">Limpiar filtros</button>
                                     </div>
                                 )}
                                 {cards.length === 0 && (
                                     <div className="col-span-full flex flex-col items-center justify-center py-20 text-gray-500">
                                         <span className="material-symbols-outlined text-[48px] mb-2 opacity-50">school</span>
-                                        <p>No flashcards yet.</p>
-                                        <p className="text-sm mt-1">Enter a topic above to generate flashcards.</p>
+                                        <p>No hay flashcards todavía.</p>
+                                        <p className="text-sm mt-1">Ingresa un tema arriba para generar flashcards.</p>
                                     </div>
                                 )}
                             </div>

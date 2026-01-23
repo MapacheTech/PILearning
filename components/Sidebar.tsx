@@ -1,34 +1,42 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { DocumentFile } from '../types';
 import { n8nService } from '../services/n8nService';
+import { useAuth } from '../contexts/AuthContext';
 
-const DOCUMENTS_STORAGE_KEY = 'pilearning_documents';
+const getDocumentsStorageKey = (userId: string) => `pilearning_documents_${userId}`;
 
 interface SidebarProps {
     onNavigate: (view: 'chat' | 'flashcards') => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
+    const { user, logout } = useAuth();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [documents, setDocuments] = useState<DocumentFile[]>([]);
     const [isUploading, setIsUploading] = useState(false);
 
-    // Load documents from localStorage on mount
+    const storageKey = user ? getDocumentsStorageKey(user.id) : null;
+
+    // Load documents from localStorage on mount (per user)
     useEffect(() => {
-        const saved = localStorage.getItem(DOCUMENTS_STORAGE_KEY);
+        if (!storageKey) return;
+        const saved = localStorage.getItem(storageKey);
         if (saved) {
             try {
                 setDocuments(JSON.parse(saved));
             } catch (e) {
                 console.error('Error parsing saved documents:', e);
             }
+        } else {
+            setDocuments([]);
         }
-    }, []);
+    }, [storageKey]);
 
-    // Save documents to localStorage whenever they change
+    // Save documents to localStorage whenever they change (per user)
     useEffect(() => {
-        localStorage.setItem(DOCUMENTS_STORAGE_KEY, JSON.stringify(documents));
-    }, [documents]);
+        if (!storageKey) return;
+        localStorage.setItem(storageKey, JSON.stringify(documents));
+    }, [documents, storageKey]);
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -122,17 +130,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
 
             {/* User Profile */}
             <div className="p-4 border-t border-white/5">
-                <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 cursor-pointer transition-colors">
-                    <img
-                        src="https://picsum.photos/100"
-                        alt="User"
-                        className="rounded-full size-9 shadow-inner border border-white/10"
-                    />
-                    <div className="flex flex-col min-w-0">
-                        <p className="text-white text-sm font-medium leading-tight truncate">User</p>
-                        <p className="text-[#9293c8] text-xs font-normal truncate">user@pilearning.ai</p>
+                <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-colors">
+                    <div className="flex items-center justify-center size-9 rounded-full bg-gradient-to-br from-primary to-indigo-600 text-white font-semibold text-sm shadow-inner border border-white/10">
+                        {user?.username?.charAt(0).toUpperCase() || 'U'}
                     </div>
-                    <span className="material-symbols-outlined text-gray-500 ml-auto" style={{ fontSize: '18px' }}>settings</span>
+                    <div className="flex flex-col min-w-0 flex-1">
+                        <p className="text-white text-sm font-medium leading-tight truncate">{user?.username || 'Usuario'}</p>
+                        <p className="text-[#9293c8] text-xs font-normal truncate">PI Learning</p>
+                    </div>
+                    <button
+                        onClick={logout}
+                        className="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                        title="Cerrar sesión"
+                    >
+                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>logout</span>
+                    </button>
                 </div>
             </div>
         </aside>

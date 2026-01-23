@@ -19,25 +19,29 @@ const fileToBase64 = (file: File): Promise<string> => {
     });
 };
 
+// Helper to generate session storage key with userId
+const getSessionKey = (userId?: string) => userId ? `chat_session_${userId}` : 'chat_session_id';
+
 // Helper to generate mock data (used for both demo mode and error fallback)
-const getMockFlashcards = (topic?: string): Flashcard[] => {
+const getMockFlashcards = (topic?: string, count: number = 3): Flashcard[] => {
+    const mockCards: Flashcard[] = [];
+    const colors: Array<'red' | 'blue' | 'emerald' | 'amber' | 'purple'> = ['red', 'blue', 'emerald', 'amber', 'purple'];
+
     if (topic) {
-        return [
-            {
-                id: Date.now().toString(),
-                question: `What is the core concept of ${topic}?`,
-                answer: `This is a generated answer explaining the fundamentals of ${topic}. (Offline Fallback)`,
+        for (let i = 0; i < count; i++) {
+            mockCards.push({
+                id: `${Date.now()}-${i}`,
+                question: `Question ${i + 1} about ${topic}?`,
+                answer: `This is a generated answer explaining aspect ${i + 1} of ${topic}. (Offline Fallback)`,
                 tag: "Custom Topic",
-                color: "purple"
-            },
-            {
-                id: (Date.now() + 1).toString(),
-                question: `Key advantages of using ${topic}?`,
-                answer: "Efficiency, scalability, and better performance in production environments.",
-                tag: "Custom Topic",
-                color: "blue"
-            }
-        ];
+                color: colors[i % colors.length],
+                topic: topic,
+                category: "General",
+                subcategory: "",
+                createdAt: Date.now()
+            });
+        }
+        return mockCards;
     }
 
     return [
@@ -46,27 +50,39 @@ const getMockFlashcards = (topic?: string): Flashcard[] => {
             question: "What is the primary function of the n8n webhook node?",
             answer: "It serves as a trigger to start a workflow when data is sent to a specific URL via HTTP methods like POST or GET.",
             tag: "Automation",
-            color: "blue"
+            color: "blue",
+            topic: "n8n",
+            category: "Automation",
+            subcategory: "Webhooks",
+            createdAt: Date.now()
         },
         {
             id: '2',
             question: "How does React handle state updates?",
             answer: "React schedules updates and re-renders components efficiently using a virtual DOM diffing algorithm.",
             tag: "Frontend",
-            color: "emerald"
+            color: "emerald",
+            topic: "React",
+            category: "Frontend",
+            subcategory: "State Management",
+            createdAt: Date.now()
         },
         {
             id: '3',
             question: "Explain the 'indexed' status in the document sidebar.",
             answer: "It indicates that the vector database has successfully processed and stored the document embeddings for retrieval.",
             tag: "System",
-            color: "red"
+            color: "red",
+            topic: "RAG",
+            category: "System",
+            subcategory: "Vector Database",
+            createdAt: Date.now()
         }
     ];
 };
 
 export const n8nService = {
-    async sendMessage(message: string, history: Message[]): Promise<Message> {
+    async sendMessage(message: string, history: Message[], userId?: string): Promise<Message> {
         try {
             if (N8N_WEBHOOKS.CHAT.includes('your-n8n-instance')) {
                 await delay(MOCK_DELAY);
@@ -79,11 +95,12 @@ export const n8nService = {
                 };
             }
 
-            // Generate or retrieve sessionId for conversation memory
-            let sessionId = sessionStorage.getItem('chat_session_id');
+            // Generate or retrieve sessionId for conversation memory (per user)
+            const sessionKey = getSessionKey(userId);
+            let sessionId = sessionStorage.getItem(sessionKey);
             if (!sessionId) {
-                sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                sessionStorage.setItem('chat_session_id', sessionId);
+                sessionId = `session-${userId || 'anon'}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                sessionStorage.setItem(sessionKey, sessionId);
             }
 
             const response = await fetch(N8N_WEBHOOKS.CHAT, {
@@ -92,6 +109,7 @@ export const n8nService = {
                 body: JSON.stringify({
                     message,
                     sessionId,
+                    userId,
                     history: history.map(m => ({
                         role: m.role,
                         content: m.content
@@ -198,12 +216,15 @@ export const n8nService = {
         }
     },
 
-    async generateFlashcards(topic?: string): Promise<Flashcard[]> {
+    async generateFlashcards(topic?: string, count: number = 10): Promise<Flashcard[]> {
+        // Enforce limits
+        const validCount = Math.min(15, Math.max(5, count));
+
         try {
             // Check for placeholder
             if (N8N_WEBHOOKS.FLASHCARDS.includes('your-n8n-instance')) {
                 await delay(MOCK_DELAY);
-                return getMockFlashcards(topic);
+                return getMockFlashcards(topic, validCount);
             }
 
             const response = await fetch(N8N_WEBHOOKS.FLASHCARDS, {
@@ -211,7 +232,8 @@ export const n8nService = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: topic ? 'generate_specific' : 'generate_all',
-                    topic: topic || ''
+                    topic: topic || '',
+                    count: validCount
                 })
             });
 
@@ -232,13 +254,17 @@ export const n8nService = {
                 flashcardsRaw = data;
             }
 
-            // Map Spanish field names to English and ensure consistent structure
+            // Map Spanish field names to English and ensure consistent structure with new fields
             const flashcards: Flashcard[] = flashcardsRaw.map((card: any) => ({
-                id: card.id || Date.now().toString() + Math.random(),
+                id: card.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                 question: card.question || card.pregunta || '',
                 answer: card.answer || card.respuesta || '',
                 tag: card.tag || card.etiqueta || 'General',
-                color: card.color || 'blue'
+                color: card.color || 'blue',
+                topic: card.topic || topic || 'General',
+                category: card.category || card.categoria || 'Sin categoría',
+                subcategory: card.subcategory || card.subcategoria || '',
+                createdAt: Date.now()
             }));
 
             return flashcards;
@@ -247,9 +273,8 @@ export const n8nService = {
             console.error('Flashcard Webhook Error:', error);
             console.warn('Falling back to mock data due to network error.');
 
-            // CRITICAL FIX: Return mock data instead of empty array on network failure
-            // This ensures the UI still works even if CORS/Mixed Content blocks the request
-            return getMockFlashcards(topic);
+            // Return mock data instead of empty array on network failure
+            return getMockFlashcards(topic, validCount);
         }
     }
 };

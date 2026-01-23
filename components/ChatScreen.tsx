@@ -3,30 +3,66 @@ import { Sidebar } from './Sidebar';
 import { TopNav } from './TopNav';
 import { Message } from '../types';
 import { n8nService } from '../services/n8nService';
+import { useAuth } from '../contexts/AuthContext';
+
+const getChatStorageKey = (userId: string) => `pilearning_chat_${userId}`;
+
+const DEFAULT_WELCOME_MESSAGE: Message = {
+    id: '1',
+    role: 'ai',
+    content: "¡Hola! Soy tu asistente de PI Learning. Sube documentos usando el panel izquierdo y podré ayudarte a estudiar, generar flashcards y responder preguntas sobre el contenido.<br/><br/>¿En qué puedo ayudarte hoy?"
+};
 
 interface ChatScreenProps {
     onNavigate: (view: 'chat' | 'flashcards') => void;
 }
 
 export const ChatScreen: React.FC<ChatScreenProps> = ({ onNavigate }) => {
-    const [messages, setMessages] = useState<Message[]>([
-        {
-            id: '1',
-            role: 'ai',
-            content: "¡Hola! Soy tu asistente de PI Learning. Sube documentos usando el panel izquierdo y podré ayudarte a estudiar, generar flashcards y responder preguntas sobre el contenido.<br/><br/>¿En qué puedo ayudarte hoy?"
-        }
-    ]);
+    const { user } = useAuth();
+    const [messages, setMessages] = useState<Message[]>([DEFAULT_WELCOME_MESSAGE]);
     const [inputValue, setInputValue] = useState("");
     const [isTyping, setIsTyping] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const [isInitialized, setIsInitialized] = useState(false);
+
+    const storageKey = user ? getChatStorageKey(user.id) : null;
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
+    // Load chat history from localStorage on mount (per user)
+    useEffect(() => {
+        if (!storageKey) return;
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    setMessages(parsed);
+                }
+            } catch (e) {
+                console.error('Error parsing saved chat:', e);
+            }
+        }
+        setIsInitialized(true);
+    }, [storageKey]);
+
+    // Save chat history to localStorage whenever messages change (per user)
+    useEffect(() => {
+        if (!storageKey || !isInitialized) return;
+        localStorage.setItem(storageKey, JSON.stringify(messages));
+    }, [messages, storageKey, isInitialized]);
+
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
+
+    const handleClearHistory = () => {
+        if (confirm('¿Estás seguro de que deseas limpiar el historial de chat?')) {
+            setMessages([DEFAULT_WELCOME_MESSAGE]);
+        }
+    };
 
     const handleSendMessage = async () => {
         if (!inputValue.trim() || isTyping) return;
@@ -44,7 +80,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ onNavigate }) => {
         setIsTyping(true);
 
         try {
-            const aiResponse = await n8nService.sendMessage(currentText, messages);
+            const aiResponse = await n8nService.sendMessage(currentText, messages, user?.id);
             setMessages(prev => [...prev, aiResponse]);
         } catch (error) {
             setMessages(prev => [...prev, {
@@ -71,9 +107,19 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ onNavigate }) => {
                 {/* Chat Area */}
                 <div className="flex-1 overflow-y-auto w-full relative custom-scrollbar">
                     <div className="max-w-4xl mx-auto w-full px-6 py-10 flex flex-col gap-8 pb-48">
-                        {/* Date Separator */}
-                        <div className="flex justify-center">
-                            <span className="text-xs font-medium text-gray-500 bg-white/5 px-3 py-1 rounded-full">Today</span>
+                        {/* Date Separator with Clear History */}
+                        <div className="flex items-center justify-center gap-4">
+                            <span className="text-xs font-medium text-gray-500 bg-white/5 px-3 py-1 rounded-full">Hoy</span>
+                            {messages.length > 1 && (
+                                <button
+                                    onClick={handleClearHistory}
+                                    className="text-xs font-medium text-gray-500 hover:text-red-400 bg-white/5 hover:bg-red-500/10 px-3 py-1 rounded-full flex items-center gap-1 transition-colors"
+                                    title="Limpiar historial"
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>delete</span>
+                                    Limpiar
+                                </button>
+                            )}
                         </div>
 
                         {messages.map((msg) => (

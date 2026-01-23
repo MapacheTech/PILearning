@@ -14,13 +14,52 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const USERS_STORAGE_KEY = 'pilearning_users';
 const SESSION_STORAGE_KEY = 'pilearning_session';
 
-// Hash password using SHA-256 via Web Crypto API
+// Simple hash function (fallback for non-secure contexts)
+// Note: This is NOT cryptographically secure, but works for local demo purposes
+function simpleHash(str: string): string {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32bit integer
+    }
+    // Add more entropy by hashing multiple times with salt
+    const salt = 'pilearning_salt_2024';
+    let result = Math.abs(hash).toString(16);
+    for (let i = 0; i < 3; i++) {
+        let tempHash = 0;
+        const combined = result + salt + i;
+        for (let j = 0; j < combined.length; j++) {
+            const char = combined.charCodeAt(j);
+            tempHash = ((tempHash << 5) - tempHash) + char;
+            tempHash = tempHash & tempHash;
+        }
+        result += Math.abs(tempHash).toString(16);
+    }
+    return result.padStart(32, '0').substring(0, 64);
+}
+
+// Hash password using SHA-256 via Web Crypto API (with fallback for non-secure contexts)
 async function hashPassword(password: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    // Check if we're in a secure context (HTTPS or localhost)
+    // This is the most reliable way to check if crypto.subtle will work
+    const isSecure = typeof window !== 'undefined' && window.isSecureContext;
+
+    if (isSecure && typeof crypto !== 'undefined' && crypto.subtle) {
+        try {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(password);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        } catch (error) {
+            console.warn('Web Crypto API failed, using fallback hash:', error);
+            return simpleHash(password);
+        }
+    }
+    // Fallback for non-secure contexts (HTTP on non-localhost IPs)
+    console.log('Using fallback hash (non-secure context detected)');
+    return simpleHash(password);
 }
 
 // Generate unique user ID
@@ -88,82 +127,103 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }, []);
 
     const login = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
-        const trimmedUsername = username.trim().toLowerCase();
+        try {
+            const trimmedUsername = username.trim().toLowerCase();
+            console.log('Login attempt for:', trimmedUsername);
 
-        if (!trimmedUsername || !password) {
-            return { success: false, error: 'Usuario y contraseña son requeridos' };
+            if (!trimmedUsername || !password) {
+                return { success: false, error: 'Usuario y contraseña son requeridos' };
+            }
+
+            const users = getStoredUsers();
+            const storedUser = users.find(u => u.username === trimmedUsername);
+
+            if (!storedUser) {
+                return { success: false, error: 'Usuario no encontrado' };
+            }
+
+            console.log('Hashing password for login...');
+            const passwordHash = await hashPassword(password);
+
+            if (storedUser.passwordHash !== passwordHash) {
+                return { success: false, error: 'Contraseña incorrecta' };
+            }
+
+            const sessionUser: User = {
+                id: storedUser.id,
+                username: storedUser.username,
+                createdAt: storedUser.createdAt
+            };
+
+            setUser(sessionUser);
+            setIsAuthenticated(true);
+            saveSession(sessionUser);
+            console.log('Login successful');
+
+            return { success: true };
+        } catch (error) {
+            console.error('Login error:', error);
+            throw error;
         }
-
-        const users = getStoredUsers();
-        const storedUser = users.find(u => u.username === trimmedUsername);
-
-        if (!storedUser) {
-            return { success: false, error: 'Usuario no encontrado' };
-        }
-
-        const passwordHash = await hashPassword(password);
-
-        if (storedUser.passwordHash !== passwordHash) {
-            return { success: false, error: 'Contraseña incorrecta' };
-        }
-
-        const sessionUser: User = {
-            id: storedUser.id,
-            username: storedUser.username,
-            createdAt: storedUser.createdAt
-        };
-
-        setUser(sessionUser);
-        setIsAuthenticated(true);
-        saveSession(sessionUser);
-
-        return { success: true };
     };
 
     const register = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
-        const trimmedUsername = username.trim().toLowerCase();
+        try {
+            const trimmedUsername = username.trim().toLowerCase();
+            console.log('Register attempt for:', trimmedUsername);
 
-        if (!trimmedUsername || !password) {
-            return { success: false, error: 'Usuario y contraseña son requeridos' };
+            if (!trimmedUsername || !password) {
+                return { success: false, error: 'Usuario y contraseña son requeridos' };
+            }
+
+            if (trimmedUsername.length < 3) {
+                return { success: false, error: 'El usuario debe tener al menos 3 caracteres' };
+            }
+
+            if (password.length < 6) {
+                return { success: false, error: 'La contraseña debe tener al menos 6 caracteres' };
+            }
+
+            const users = getStoredUsers();
+            console.log('Existing users:', users.length);
+
+            const existingUser = users.find(u => u.username === trimmedUsername);
+
+            if (existingUser) {
+                return { success: false, error: 'El usuario ya existe' };
+            }
+
+            console.log('Hashing password...');
+            const passwordHash = await hashPassword(password);
+            console.log('Password hashed successfully');
+
+            const newUser: StoredUser = {
+                id: generateUserId(),
+                username: trimmedUsername,
+                passwordHash,
+                createdAt: Date.now()
+            };
+
+            users.push(newUser);
+            saveUsers(users);
+            console.log('User saved to localStorage');
+
+            const sessionUser: User = {
+                id: newUser.id,
+                username: newUser.username,
+                createdAt: newUser.createdAt
+            };
+
+            setUser(sessionUser);
+            setIsAuthenticated(true);
+            saveSession(sessionUser);
+            console.log('Registration complete');
+
+            return { success: true };
+        } catch (error) {
+            console.error('Register error:', error);
+            throw error; // Re-throw to be caught by LoginScreen
         }
-
-        if (trimmedUsername.length < 3) {
-            return { success: false, error: 'El usuario debe tener al menos 3 caracteres' };
-        }
-
-        if (password.length < 6) {
-            return { success: false, error: 'La contraseña debe tener al menos 6 caracteres' };
-        }
-
-        const users = getStoredUsers();
-        const existingUser = users.find(u => u.username === trimmedUsername);
-
-        if (existingUser) {
-            return { success: false, error: 'El usuario ya existe' };
-        }
-
-        const passwordHash = await hashPassword(password);
-        const newUser: StoredUser = {
-            id: generateUserId(),
-            username: trimmedUsername,
-            passwordHash,
-            createdAt: Date.now()
-        };
-
-        users.push(newUser);
-        saveUsers(users);
-
-        const sessionUser: User = {
-            id: newUser.id,
-            username: newUser.username,
-            createdAt: newUser.createdAt
-        };
-
-        setUser(sessionUser);
-        setIsAuthenticated(true);
-        saveSession(sessionUser);
-
-        return { success: true };
     };
 
     const logout = () => {

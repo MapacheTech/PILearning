@@ -35,7 +35,8 @@ export const LoginScreen: React.FC = () => {
                 setError(result.error || 'Error desconocido');
             }
         } catch (err) {
-            setError('Error de conexión');
+            console.error('Auth error:', err);
+            setError(err instanceof Error ? err.message : 'Error desconocido');
         } finally {
             setIsLoading(false);
         }
@@ -175,6 +176,9 @@ export const LoginScreen: React.FC = () => {
                 {/* Footer */}
                 <p className="text-center text-xs text-gray-600 mt-6">
                     Los datos se almacenan localmente en tu navegador
+                </p>
+                <p className="text-center text-xs text-green-500 mt-2">
+                    v2.1 - Build actualizado
                 </p>
             </div>
         </div>
